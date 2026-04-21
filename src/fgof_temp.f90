@@ -13,6 +13,8 @@ module fgof_temp
     FGOF_TEMP_ERR_REPLACE_FAILED, &
     FGOF_TEMP_ERR_WRITE_FAILED, &
     FGOF_TEMP_OK, &
+    temp_guard_entry, &
+    temp_guard, &
     temp_options, &
     temp_resource, &
     write_result
@@ -28,15 +30,22 @@ module fgof_temp
     FGOF_TEMP_ERR_WRITE_FAILED, &
     FGOF_TEMP_OK, &
     atomic_write, &
+    clear_temp_guard, &
     clear_temp_options, &
     clear_temp_resource, &
     clear_write_result, &
+    cleanup_guard, &
     cleanup_temp, &
+    close_temp, &
+    guard_entry_count, &
     make_temp_dir, &
     make_temp_file, &
+    register_temp, &
+    release_temp, &
     replace_file, &
     temp_backend_name, &
     temp_error_name, &
+    temp_guard, &
     temp_options, &
     temp_resource, &
     write_result
@@ -72,6 +81,16 @@ contains
     result_value%staging_path = ""
     result_value%error_message = ""
   end function clear_write_result
+
+  function clear_temp_guard() result(guard)
+    type(temp_guard) :: guard
+
+    guard%active = .false.
+    guard%tracked_count = 0
+    guard%last_error_code = FGOF_TEMP_OK
+    guard%last_error_message = ""
+    allocate(guard%entries(0))
+  end function clear_temp_guard
 
   function make_temp_file(options) result(resource)
     type(temp_options), intent(in), optional :: options
@@ -143,6 +162,14 @@ contains
       return
     end if
 
+    if (.not. path_exists_posix(resource%path)) then
+      resource%created = .false.
+      resource%owned = .false.
+      resource%error_code = FGOF_TEMP_OK
+      resource%error_message = ""
+      return
+    end if
+
     success = remove_temp_path_posix(resource%path, resource%directory, sys_errno)
     if (.not. success) then
       call set_error(resource, FGOF_TEMP_ERR_CLEANUP_FAILED, errno_message("temp cleanup failed", sys_errno))
@@ -154,6 +181,105 @@ contains
     resource%error_code = FGOF_TEMP_OK
     resource%error_message = ""
   end subroutine cleanup_temp
+
+  subroutine release_temp(resource)
+    type(temp_resource), intent(inout) :: resource
+
+    resource%owned = .false.
+    resource%error_code = FGOF_TEMP_OK
+    resource%error_message = ""
+  end subroutine release_temp
+
+  subroutine close_temp(resource)
+    type(temp_resource), intent(inout) :: resource
+
+    if (.not. resource%created) then
+      resource%error_code = FGOF_TEMP_OK
+      resource%error_message = ""
+      return
+    end if
+
+    if (.not. resource%owned) then
+      resource%error_code = FGOF_TEMP_OK
+      resource%error_message = ""
+      return
+    end if
+
+    if (resource%cleanup_on_close) then
+      call cleanup_temp(resource)
+    else
+      call release_temp(resource)
+    end if
+  end subroutine close_temp
+
+  subroutine register_temp(guard, resource)
+    type(temp_guard), intent(inout) :: guard
+    type(temp_resource), intent(inout) :: resource
+    integer :: next_index
+
+    call clear_guard_error(guard)
+
+    if (.not. resource%created) return
+    if (.not. resource%owned) return
+
+    next_index = guard%tracked_count + 1
+    call ensure_guard_capacity(guard, next_index)
+
+    guard%entries(next_index)%active = .true.
+    guard%entries(next_index)%directory = resource%directory
+    guard%entries(next_index)%cleanup_on_close = resource%cleanup_on_close
+    guard%entries(next_index)%path = resource%path
+    guard%tracked_count = next_index
+    guard%active = (guard%tracked_count > 0)
+
+    call release_temp(resource)
+  end subroutine register_temp
+
+  logical function cleanup_guard(guard) result(success)
+    type(temp_guard), intent(inout) :: guard
+    integer :: i
+    integer :: sys_errno
+    logical :: removed
+
+    success = .true.
+    call clear_guard_error(guard)
+
+    if (.not. allocated(guard%entries)) then
+      guard%active = .false.
+      guard%tracked_count = 0
+      return
+    end if
+
+    do i = size(guard%entries), 1, -1
+      if (.not. guard%entries(i)%active) cycle
+
+      if (guard%entries(i)%cleanup_on_close) then
+        if (path_exists_posix(guard%entries(i)%path)) then
+          removed = remove_temp_path_posix(guard%entries(i)%path, guard%entries(i)%directory, sys_errno)
+          if (.not. removed) then
+            success = .false.
+            if (guard%last_error_code == FGOF_TEMP_OK) then
+              guard%last_error_code = FGOF_TEMP_ERR_CLEANUP_FAILED
+              guard%last_error_message = errno_message("guard cleanup failed", sys_errno)
+            end if
+            cycle
+          end if
+        end if
+      end if
+
+      guard%entries(i)%active = .false.
+      if (allocated(guard%entries(i)%path)) deallocate(guard%entries(i)%path)
+    end do
+
+    guard%tracked_count = count_active_entries(guard)
+    guard%active = (guard%tracked_count > 0)
+  end function cleanup_guard
+
+  integer function guard_entry_count(guard) result(count_value)
+    type(temp_guard), intent(in) :: guard
+
+    count_value = guard%tracked_count
+  end function guard_entry_count
 
   function atomic_write(path, text) result(result_value)
     character(len=*), intent(in) :: path
@@ -345,6 +471,55 @@ contains
     result_value%error_code = code
     result_value%error_message = message
   end subroutine set_write_error
+
+  subroutine clear_guard_error(guard)
+    type(temp_guard), intent(inout) :: guard
+
+    guard%last_error_code = FGOF_TEMP_OK
+    guard%last_error_message = ""
+  end subroutine clear_guard_error
+
+  subroutine ensure_guard_capacity(guard, required_size)
+    type(temp_guard), intent(inout) :: guard
+    integer, intent(in) :: required_size
+    type(temp_guard) :: fresh_guard
+    integer :: old_size
+    integer :: i
+
+    if (.not. allocated(guard%entries)) then
+      fresh_guard = clear_temp_guard()
+      call move_alloc(fresh_guard%entries, guard%entries)
+    end if
+
+    old_size = size(guard%entries)
+    if (old_size >= required_size) return
+
+    block
+      type(temp_guard_entry), allocatable :: resized(:)
+
+      allocate(resized(required_size))
+      if (old_size > 0) resized(:old_size) = guard%entries
+      do i = old_size + 1, required_size
+        resized(i)%active = .false.
+        resized(i)%directory = .false.
+        resized(i)%cleanup_on_close = .true.
+        resized(i)%path = ""
+      end do
+      call move_alloc(resized, guard%entries)
+    end block
+  end subroutine ensure_guard_capacity
+
+  integer function count_active_entries(guard) result(active_count)
+    type(temp_guard), intent(in) :: guard
+    integer :: i
+
+    active_count = 0
+    if (.not. allocated(guard%entries)) return
+
+    do i = 1, size(guard%entries)
+      if (guard%entries(i)%active) active_count = active_count + 1
+    end do
+  end function count_active_entries
 
   logical function validate_target_path(path, result_value) result(valid)
     character(len=*), intent(in) :: path

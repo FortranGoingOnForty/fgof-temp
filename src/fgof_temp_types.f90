@@ -37,4 +37,19 @@ module fgof_temp_types
     character(len=:), allocatable :: error_message
   end type write_result
 
+  type, public :: temp_guard_entry
+    logical :: active = .false.
+    logical :: directory = .false.
+    logical :: cleanup_on_close = .true.
+    character(len=:), allocatable :: path
+  end type temp_guard_entry
+
+  type, public :: temp_guard
+    logical :: active = .false.
+    integer :: tracked_count = 0
+    integer :: last_error_code = FGOF_TEMP_OK
+    character(len=:), allocatable :: last_error_message
+    type(temp_guard_entry), allocatable :: entries(:)
+  end type temp_guard
+
 end module fgof_temp_types
