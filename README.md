@@ -24,14 +24,15 @@ Future scope:
 
 ## Status
 
-Sprint 02 is in place.
+Sprint 03 is in place.
 
 Tracked today:
 
 - real temp file and temp directory creation
 - text-focused `atomic_write()` and `replace_file()` helpers
-- explicit ownership and cleanup semantics on `temp_resource`
-- CI and `fpm test` coverage for creation, cleanup, write, replace, and failure edges
+- explicit `close_temp()` / `release_temp()` semantics on `temp_resource`
+- `temp_guard` ownership-transfer cleanup for grouped resource lifecycles
+- tracked examples plus CI coverage for tests and examples
 
 ## Why Use It
 
@@ -51,6 +52,7 @@ Public types:
 - `temp_options`
 - `temp_resource`
 - `write_result`
+- `temp_guard`
 
 Public constants:
 
@@ -69,9 +71,15 @@ Current public procedures:
 - `make_temp_file`
 - `make_temp_dir`
 - `cleanup_temp`
+- `close_temp`
+- `release_temp`
 - `clear_write_result`
 - `atomic_write`
 - `replace_file`
+- `clear_temp_guard`
+- `register_temp`
+- `cleanup_guard`
+- `guard_entry_count`
 - `temp_backend_name`
 - `temp_error_name`
 
@@ -80,8 +88,12 @@ Current semantics:
 - `make_temp_file()` creates a real file path and closes the created handle before returning
 - `make_temp_dir()` creates a real directory path
 - `cleanup_temp()` removes owned resources explicitly
+- `close_temp()` respects `cleanup_on_close`: it deletes owned resources when enabled and otherwise just releases ownership
+- `release_temp()` leaves the path in place but hands cleanup responsibility back to the caller
 - `atomic_write(path, text)` writes through a same-directory temp file and then renames into place
 - `replace_file(source, destination)` renames an existing file into place with replacement semantics
+- `register_temp()` transfers ownership from a `temp_resource` into a `temp_guard`
+- `cleanup_guard()` walks tracked resources in reverse order, which is the safe default for nested temp trees
 - temp-file `suffix` is supported
 - temp-directory `suffix` is not supported in this first pass and is rejected as invalid options
 - `atomic_write()` is text-focused in `v0.1`; it preserves the exact Fortran character payload you pass in
