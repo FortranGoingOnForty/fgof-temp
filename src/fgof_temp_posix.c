@@ -170,3 +170,13 @@ int fgof_temp_is_directory(const char *path) {
     }
     return S_ISDIR(st.st_mode) ? 1 : 0;
 }
+
+int fgof_temp_rename_path(const char *source, const char *destination, int *sys_errno) {
+    if (rename(source, destination) != 0) {
+        *sys_errno = errno;
+        return 0;
+    }
+
+    *sys_errno = 0;
+    return 1;
+}

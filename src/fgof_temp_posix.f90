@@ -10,6 +10,7 @@ module fgof_temp_posix
   public :: from_c_string
   public :: is_directory_path_posix
   public :: path_exists_posix
+  public :: rename_path_posix
   public :: remove_temp_path_posix
   public :: to_c_string
 
@@ -54,6 +55,14 @@ module fgof_temp_posix
       character(kind=c_char), intent(in) :: path(*)
       integer(c_int) :: fgof_temp_is_directory
     end function fgof_temp_is_directory
+
+    function fgof_temp_rename_path(source, destination, sys_errno) bind(C, name="fgof_temp_rename_path")
+      import :: c_char, c_int
+      character(kind=c_char), intent(in) :: source(*)
+      character(kind=c_char), intent(in) :: destination(*)
+      integer(c_int), intent(out) :: sys_errno
+      integer(c_int) :: fgof_temp_rename_path
+    end function fgof_temp_rename_path
   end interface
 
 contains
@@ -141,6 +150,20 @@ contains
     c_path = to_c_string(path)
     success = (fgof_temp_is_directory(c_path) /= 0_c_int)
   end function is_directory_path_posix
+
+  logical function rename_path_posix(source, destination, sys_errno) result(success)
+    character(len=*), intent(in) :: source
+    character(len=*), intent(in) :: destination
+    integer, intent(out) :: sys_errno
+    character(kind=c_char), allocatable :: c_source(:)
+    character(kind=c_char), allocatable :: c_destination(:)
+    integer(c_int) :: c_errno
+
+    c_source = to_c_string(source)
+    c_destination = to_c_string(destination)
+    success = (fgof_temp_rename_path(c_source, c_destination, c_errno) /= 0_c_int)
+    sys_errno = int(c_errno)
+  end function rename_path_posix
 
   function to_c_string(str) result(buf)
     character(len=*), intent(in) :: str
