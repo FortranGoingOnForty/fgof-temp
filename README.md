@@ -24,7 +24,7 @@ Future scope:
 
 ## Status
 
-Sprint 03 is in place.
+Sprint 04 is in place, and the package is in release audit.
 
 Tracked today:
 
@@ -108,8 +108,8 @@ That is the baseline verification command locally and in CI.
 
 Tracked examples:
 
-- [example/atomic_write_demo.f90](/Users/mfwolffe/GithubOrgs/FortranGoingOnForty/fgof-temp/example/atomic_write_demo.f90)
-- [example/guard_cleanup_demo.f90](/Users/mfwolffe/GithubOrgs/FortranGoingOnForty/fgof-temp/example/guard_cleanup_demo.f90)
+- [example/atomic_write_demo.f90](example/atomic_write_demo.f90)
+- [example/guard_cleanup_demo.f90](example/guard_cleanup_demo.f90)
 
 ## Supported Platforms
 
