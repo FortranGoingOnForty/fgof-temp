@@ -6,18 +6,21 @@ program test_scaffold
     FGOF_TEMP_ERR_WRITE_FAILED, &
     FGOF_TEMP_OK, &
     atomic_write, &
+    clear_temp_guard, &
     clear_temp_options, &
     clear_temp_resource, &
     clear_write_result, &
     cleanup_temp, &
+    guard_entry_count, &
     make_temp_dir, &
     make_temp_file, &
     replace_file, &
     temp_backend_name, &
     temp_error_name
-  use fgof_temp_types, only : temp_options, temp_resource, write_result
+  use fgof_temp_types, only : temp_guard, temp_options, temp_resource, write_result
   implicit none
 
+  type(temp_guard) :: guard
   type(temp_options) :: options
   type(temp_resource) :: resource
   type(write_result) :: write_outcome
@@ -45,6 +48,12 @@ program test_scaffold
   if (write_outcome%path /= "") error stop "write result should default to an empty path"
   if (write_outcome%staging_path /= "") error stop "write result should default to an empty staging path"
   if (write_outcome%error_message /= "") error stop "write result should default to an empty message"
+
+  guard = clear_temp_guard()
+  if (guard%active) error stop "temp guard should start inactive"
+  if (guard_entry_count(guard) /= 0) error stop "temp guard should start empty"
+  if (guard%last_error_code /= FGOF_TEMP_OK) error stop "temp guard should start ok"
+  if (guard%last_error_message /= "") error stop "temp guard should start with an empty message"
 
   resource = make_temp_file()
   if (.not. resource%created) error stop "temp file creation should succeed from the scaffold surface"
