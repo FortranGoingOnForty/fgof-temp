@@ -4,6 +4,8 @@ module fgof_temp_types
 
   integer, parameter, public :: FGOF_TEMP_OK = 0
   integer, parameter, public :: FGOF_TEMP_ERR_INVALID_OPTIONS = 10
+  integer, parameter, public :: FGOF_TEMP_ERR_CREATE_FAILED = 20
+  integer, parameter, public :: FGOF_TEMP_ERR_CLEANUP_FAILED = 30
   integer, parameter, public :: FGOF_TEMP_ERR_INTERNAL = 99
 
   type, public :: temp_options
@@ -18,6 +20,7 @@ module fgof_temp_types
     logical :: created = .false.
     logical :: directory = .false.
     logical :: owned = .false.
+    logical :: cleanup_on_close = .true.
     integer :: error_code = FGOF_TEMP_OK
     character(len=:), allocatable :: path
     character(len=:), allocatable :: error_message
