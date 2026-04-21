@@ -58,3 +58,12 @@ jobs:
 
       - name: Run test suite
         run: fpm test --verbose
+
+      - name: Run examples
+        run: |
+          guard_bin=$(find build -type f -path '*/example/guard_cleanup_demo' | head -n 1)
+          atomic_bin=$(find build -type f -path '*/example/atomic_write_demo' | head -n 1)
+          test -n "$guard_bin"
+          test -n "$atomic_bin"
+          "$guard_bin"
+          "$atomic_bin"
