@@ -24,14 +24,14 @@ Future scope:
 
 ## Status
 
-Sprint 01 is in place.
+Sprint 02 is in place.
 
 Tracked today:
 
 - real temp file and temp directory creation
+- text-focused `atomic_write()` and `replace_file()` helpers
 - explicit ownership and cleanup semantics on `temp_resource`
-- prefix, suffix, and parent-directory options for temp files
-- CI and `fpm test` coverage for creation, cleanup, and option validation
+- CI and `fpm test` coverage for creation, cleanup, write, replace, and failure edges
 
 ## Why Use It
 
@@ -50,6 +50,7 @@ Public types:
 
 - `temp_options`
 - `temp_resource`
+- `write_result`
 
 Public constants:
 
@@ -57,6 +58,8 @@ Public constants:
 - `FGOF_TEMP_ERR_INVALID_OPTIONS`
 - `FGOF_TEMP_ERR_CREATE_FAILED`
 - `FGOF_TEMP_ERR_CLEANUP_FAILED`
+- `FGOF_TEMP_ERR_WRITE_FAILED`
+- `FGOF_TEMP_ERR_REPLACE_FAILED`
 - `FGOF_TEMP_ERR_INTERNAL`
 
 Current public procedures:
@@ -66,6 +69,9 @@ Current public procedures:
 - `make_temp_file`
 - `make_temp_dir`
 - `cleanup_temp`
+- `clear_write_result`
+- `atomic_write`
+- `replace_file`
 - `temp_backend_name`
 - `temp_error_name`
 
@@ -74,8 +80,11 @@ Current semantics:
 - `make_temp_file()` creates a real file path and closes the created handle before returning
 - `make_temp_dir()` creates a real directory path
 - `cleanup_temp()` removes owned resources explicitly
+- `atomic_write(path, text)` writes through a same-directory temp file and then renames into place
+- `replace_file(source, destination)` renames an existing file into place with replacement semantics
 - temp-file `suffix` is supported
 - temp-directory `suffix` is not supported in this first pass and is rejected as invalid options
+- `atomic_write()` is text-focused in `v0.1`; it preserves the exact Fortran character payload you pass in
 
 ## Build And Test
 
