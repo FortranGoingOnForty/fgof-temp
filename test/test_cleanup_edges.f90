@@ -5,6 +5,7 @@ program test_cleanup_edges
     cleanup_guard, &
     cleanup_temp, &
     clear_temp_guard, &
+    clear_temp_options, &
     guard_entry_count, &
     make_temp_dir, &
     make_temp_file, &
@@ -18,8 +19,12 @@ program test_cleanup_edges
   type(temp_options) :: options
   type(temp_resource) :: file_resource
   type(temp_resource) :: dir_resource
+  type(temp_resource) :: retained_dir
+  type(temp_resource) :: removed_file
+  type(temp_resource) :: replacement_file
   logical :: success
   character(len=:), allocatable :: child_path
+  character(len=:), allocatable :: retained_child_path
 
   file_resource = make_temp_file()
   if (.not. file_resource%created) error stop "cleanup edge test should create a temp file"
@@ -30,12 +35,8 @@ program test_cleanup_edges
   if (file_resource%created) error stop "cleanup_temp should clear created after missing-path cleanup"
   if (file_resource%owned) error stop "cleanup_temp should clear ownership after missing-path cleanup"
 
-  options%directory = .false.
+  options = clear_temp_options()
   options%cleanup_on_close = .true.
-  if (allocated(options%prefix)) deallocate(options%prefix)
-  if (allocated(options%suffix)) deallocate(options%suffix)
-  if (allocated(options%parent_dir)) deallocate(options%parent_dir)
-
   file_resource = make_temp_file(options)
   if (.not. file_resource%created) error stop "release edge test should create a temp file"
 
@@ -67,6 +68,40 @@ program test_cleanup_edges
   if (guard_entry_count(guard) /= 0) error stop "successful guard retry should clear tracked entries"
   if (guard%active) error stop "successful guard retry should deactivate the guard"
   if (path_exists_posix(dir_resource%path)) error stop "successful guard retry should remove the directory"
+
+  guard = clear_temp_guard()
+
+  removed_file = make_temp_file()
+  if (.not. removed_file%created) error stop "guard slot reuse test should create a temp file"
+
+  retained_dir = make_temp_dir()
+  if (.not. retained_dir%created) error stop "guard slot reuse test should create a temp directory"
+
+  retained_child_path = retained_dir%path // "/blocked.txt"
+  call write_text_file(retained_child_path, "keep")
+
+  call register_temp(guard, removed_file)
+  call register_temp(guard, retained_dir)
+
+  success = cleanup_guard(guard)
+  if (success) error stop "guard cleanup should fail when the higher slot stays blocked"
+  if (guard_entry_count(guard) /= 1) error stop "guard cleanup should leave one active blocked entry"
+  if (.not. path_exists_posix(retained_dir%path)) error stop "blocked guard entry should remain after failed cleanup"
+  if (path_exists_posix(removed_file%path)) error stop "successful lower-slot cleanup should still remove its file"
+
+  replacement_file = make_temp_file()
+  if (.not. replacement_file%created) error stop "guard slot reuse test should create a replacement temp file"
+
+  call register_temp(guard, replacement_file)
+  if (guard_entry_count(guard) /= 2) error stop "register_temp should preserve blocked entries when reusing open guard slots"
+  if (.not. path_exists_posix(replacement_file%path)) error stop "replacement guard entry should remain on disk until cleanup"
+
+  call remove_file(retained_child_path)
+  success = cleanup_guard(guard)
+  if (.not. success) error stop "guard cleanup retry should succeed after the blocked entry is cleared"
+  if (guard_entry_count(guard) /= 0) error stop "guard cleanup retry should remove both surviving entries"
+  if (path_exists_posix(retained_dir%path)) error stop "guard cleanup retry should still remove the originally blocked directory"
+  if (path_exists_posix(replacement_file%path)) error stop "guard cleanup retry should also remove the newly registered file"
 
 contains
 

@@ -55,7 +55,6 @@ contains
   function clear_temp_options() result(options)
     type(temp_options) :: options
 
-    options%directory = .false.
     options%cleanup_on_close = .true.
   end function clear_temp_options
 
@@ -215,21 +214,21 @@ contains
   subroutine register_temp(guard, resource)
     type(temp_guard), intent(inout) :: guard
     type(temp_resource), intent(inout) :: resource
-    integer :: next_index
+    integer :: slot_index
 
     call clear_guard_error(guard)
 
     if (.not. resource%created) return
     if (.not. resource%owned) return
 
-    next_index = guard%tracked_count + 1
-    call ensure_guard_capacity(guard, next_index)
+    slot_index = next_guard_slot(guard)
+    call ensure_guard_capacity(guard, slot_index)
 
-    guard%entries(next_index)%active = .true.
-    guard%entries(next_index)%directory = resource%directory
-    guard%entries(next_index)%cleanup_on_close = resource%cleanup_on_close
-    guard%entries(next_index)%path = resource%path
-    guard%tracked_count = next_index
+    guard%entries(slot_index)%active = .true.
+    guard%entries(slot_index)%directory = resource%directory
+    guard%entries(slot_index)%cleanup_on_close = resource%cleanup_on_close
+    guard%entries(slot_index)%path = resource%path
+    guard%tracked_count = count_active_entries(guard)
     guard%active = (guard%tracked_count > 0)
 
     call release_temp(resource)
@@ -287,6 +286,7 @@ contains
     type(write_result) :: result_value
     type(temp_options) :: options
     type(temp_resource) :: staging
+    character(len=:), allocatable :: io_message
     integer :: sys_errno
     logical :: success
 
@@ -307,10 +307,10 @@ contains
 
     result_value%staging_path = staging%path
 
-    success = write_text_file(staging%path, text, sys_errno)
+    success = write_text_file(staging%path, text, io_message)
     if (.not. success) then
       call cleanup_temp(staging)
-      call set_write_error(result_value, FGOF_TEMP_ERR_WRITE_FAILED, errno_message("atomic write failed", sys_errno))
+      call set_write_error(result_value, FGOF_TEMP_ERR_WRITE_FAILED, io_message)
       return
     end if
 
@@ -521,6 +521,25 @@ contains
     end do
   end function count_active_entries
 
+  integer function next_guard_slot(guard) result(slot_index)
+    type(temp_guard), intent(in) :: guard
+    integer :: i
+
+    if (.not. allocated(guard%entries)) then
+      slot_index = 1
+      return
+    end if
+
+    do i = 1, size(guard%entries)
+      if (.not. guard%entries(i)%active) then
+        slot_index = i
+        return
+      end if
+    end do
+
+    slot_index = size(guard%entries) + 1
+  end function next_guard_slot
+
   logical function validate_target_path(path, result_value) result(valid)
     character(len=*), intent(in) :: path
     type(write_result), intent(inout) :: result_value
@@ -563,40 +582,59 @@ contains
     end if
   end function parent_directory
 
-  logical function write_text_file(path, text, sys_errno) result(success)
+  logical function write_text_file(path, text, error_message) result(success)
     character(len=*), intent(in) :: path
     character(len=*), intent(in) :: text
-    integer, intent(out) :: sys_errno
+    character(len=:), allocatable, intent(out) :: error_message
     integer :: unit
     integer :: ios
+    character(len=256) :: iomsg
 
-    open(newunit=unit, file=path, status="old", access="stream", form="unformatted", action="write", iostat=ios)
+    iomsg = ""
+    open(newunit=unit, file=path, status="old", access="stream", form="unformatted", action="write", iostat=ios, iomsg=iomsg)
     if (ios /= 0) then
-      sys_errno = ios
+      error_message = io_status_message("atomic write failed while opening staging file", ios, iomsg)
       success = .false.
       return
     end if
 
     if (len(text) > 0) then
-      write(unit, iostat=ios) text
+      iomsg = ""
+      write(unit, iostat=ios, iomsg=iomsg) text
       if (ios /= 0) then
         close(unit)
-        sys_errno = ios
+        error_message = io_status_message("atomic write failed while writing staging file", ios, iomsg)
         success = .false.
         return
       end if
     end if
 
-    close(unit, iostat=ios)
+    iomsg = ""
+    close(unit, iostat=ios, iomsg=iomsg)
     if (ios /= 0) then
-      sys_errno = ios
+      error_message = io_status_message("atomic write failed while closing staging file", ios, iomsg)
       success = .false.
       return
     end if
 
-    sys_errno = 0
+    error_message = ""
     success = .true.
   end function write_text_file
+
+  function io_status_message(prefix, status_code, iomsg) result(message)
+    character(len=*), intent(in) :: prefix
+    integer, intent(in) :: status_code
+    character(len=*), intent(in) :: iomsg
+    character(len=:), allocatable :: message
+    character(len=32) :: status_text
+
+    write(status_text, "(i0)") status_code
+    if (len_trim(iomsg) > 0) then
+      message = prefix // " (iostat=" // trim(status_text) // ", " // trim(iomsg) // ")"
+    else
+      message = prefix // " (iostat=" // trim(status_text) // ")"
+    end if
+  end function io_status_message
 
   function errno_message(prefix, sys_errno) result(message)
     character(len=*), intent(in) :: prefix

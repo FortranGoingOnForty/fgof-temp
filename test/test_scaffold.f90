@@ -26,7 +26,6 @@ program test_scaffold
   type(write_result) :: write_outcome
 
   options = clear_temp_options()
-  if (options%directory) error stop "temp options should default to file mode"
   if (.not. options%cleanup_on_close) error stop "temp options should default to cleanup on close"
   if (allocated(options%prefix)) error stop "temp options should not allocate prefix by default"
   if (allocated(options%suffix)) error stop "temp options should not allocate suffix by default"

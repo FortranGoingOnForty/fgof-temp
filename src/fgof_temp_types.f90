@@ -11,7 +11,6 @@ module fgof_temp_types
   integer, parameter, public :: FGOF_TEMP_ERR_INTERNAL = 99
 
   type, public :: temp_options
-    logical :: directory = .false.
     logical :: cleanup_on_close = .true.
     character(len=:), allocatable :: prefix
     character(len=:), allocatable :: suffix
