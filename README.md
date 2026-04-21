@@ -106,6 +106,11 @@ fpm test
 
 That is the baseline verification command locally and in CI.
 
+Tracked examples:
+
+- [example/atomic_write_demo.f90](/Users/mfwolffe/GithubOrgs/FortranGoingOnForty/fgof-temp/example/atomic_write_demo.f90)
+- [example/guard_cleanup_demo.f90](/Users/mfwolffe/GithubOrgs/FortranGoingOnForty/fgof-temp/example/guard_cleanup_demo.f90)
+
 ## Supported Platforms
 
 - macOS
