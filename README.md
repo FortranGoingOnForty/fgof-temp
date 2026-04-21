@@ -24,14 +24,14 @@ Future scope:
 
 ## Status
 
-Initial scaffold is in place.
+Sprint 01 is in place.
 
 Tracked today:
 
-- public `fgof_temp` and `fgof_temp_types` modules
-- initial temp options and temp resource types
-- stable error constants with naming helpers
-- CI and `fpm test` baseline wiring
+- real temp file and temp directory creation
+- explicit ownership and cleanup semantics on `temp_resource`
+- prefix, suffix, and parent-directory options for temp files
+- CI and `fpm test` coverage for creation, cleanup, and option validation
 
 ## Why Use It
 
@@ -55,14 +55,27 @@ Public constants:
 
 - `FGOF_TEMP_OK`
 - `FGOF_TEMP_ERR_INVALID_OPTIONS`
+- `FGOF_TEMP_ERR_CREATE_FAILED`
+- `FGOF_TEMP_ERR_CLEANUP_FAILED`
 - `FGOF_TEMP_ERR_INTERNAL`
 
 Current public procedures:
 
 - `clear_temp_options`
 - `clear_temp_resource`
+- `make_temp_file`
+- `make_temp_dir`
+- `cleanup_temp`
 - `temp_backend_name`
 - `temp_error_name`
+
+Current semantics:
+
+- `make_temp_file()` creates a real file path and closes the created handle before returning
+- `make_temp_dir()` creates a real directory path
+- `cleanup_temp()` removes owned resources explicitly
+- temp-file `suffix` is supported
+- temp-directory `suffix` is not supported in this first pass and is rejected as invalid options
 
 ## Build And Test
 
