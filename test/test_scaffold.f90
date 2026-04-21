@@ -2,19 +2,25 @@ program test_scaffold
   use fgof_temp, only : &
     FGOF_TEMP_ERR_CLEANUP_FAILED, &
     FGOF_TEMP_ERR_CREATE_FAILED, &
+    FGOF_TEMP_ERR_REPLACE_FAILED, &
+    FGOF_TEMP_ERR_WRITE_FAILED, &
     FGOF_TEMP_OK, &
+    atomic_write, &
     clear_temp_options, &
     clear_temp_resource, &
+    clear_write_result, &
     cleanup_temp, &
     make_temp_dir, &
     make_temp_file, &
+    replace_file, &
     temp_backend_name, &
     temp_error_name
-  use fgof_temp_types, only : temp_options, temp_resource
+  use fgof_temp_types, only : temp_options, temp_resource, write_result
   implicit none
 
   type(temp_options) :: options
   type(temp_resource) :: resource
+  type(write_result) :: write_outcome
 
   options = clear_temp_options()
   if (options%directory) error stop "temp options should default to file mode"
@@ -32,6 +38,14 @@ program test_scaffold
   if (resource%path /= "") error stop "temp resource should default to an empty path"
   if (resource%error_message /= "") error stop "temp resource should default to an empty message"
 
+  write_outcome = clear_write_result()
+  if (write_outcome%completed) error stop "write result should start incomplete"
+  if (write_outcome%replaced) error stop "write result should start unreplaced"
+  if (write_outcome%error_code /= FGOF_TEMP_OK) error stop "write result should default to ok"
+  if (write_outcome%path /= "") error stop "write result should default to an empty path"
+  if (write_outcome%staging_path /= "") error stop "write result should default to an empty staging path"
+  if (write_outcome%error_message /= "") error stop "write result should default to an empty message"
+
   resource = make_temp_file()
   if (.not. resource%created) error stop "temp file creation should succeed from the scaffold surface"
   call cleanup_temp(resource)
@@ -45,5 +59,7 @@ program test_scaffold
   if (temp_error_name(10) /= "invalid-options") error stop "error helper should map invalid options"
   if (temp_error_name(FGOF_TEMP_ERR_CREATE_FAILED) /= "create-failed") error stop "error helper should map create failures"
   if (temp_error_name(FGOF_TEMP_ERR_CLEANUP_FAILED) /= "cleanup-failed") error stop "error helper should map cleanup failures"
+  if (temp_error_name(FGOF_TEMP_ERR_WRITE_FAILED) /= "write-failed") error stop "error helper should map write failures"
+  if (temp_error_name(FGOF_TEMP_ERR_REPLACE_FAILED) /= "replace-failed") error stop "error helper should map replace failures"
   if (temp_error_name(999) /= "unknown") error stop "error helper should map unknown codes"
 end program test_scaffold
