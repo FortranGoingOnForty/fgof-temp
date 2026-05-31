@@ -79,6 +79,9 @@ contains
     character(kind=c_char) :: c_path(PATH_BUFFER_LEN)
     integer(c_int) :: c_errno
 
+    allocate(c_parent(0))
+    allocate(c_prefix(0))
+    allocate(c_suffix(0))
     c_parent = to_c_string(parent_dir)
     c_prefix = to_c_string(prefix)
     c_suffix = to_c_string(suffix)
@@ -103,6 +106,8 @@ contains
     character(kind=c_char) :: c_path(PATH_BUFFER_LEN)
     integer(c_int) :: c_errno
 
+    allocate(c_parent(0))
+    allocate(c_prefix(0))
     c_parent = to_c_string(parent_dir)
     c_prefix = to_c_string(prefix)
     c_path = c_null_char
@@ -124,6 +129,7 @@ contains
     integer(c_int) :: c_errno
     integer(c_int) :: c_directory
 
+    allocate(c_path(0))
     c_path = to_c_string(path)
     if (directory) then
       c_directory = 1_c_int
@@ -139,6 +145,7 @@ contains
     character(len=*), intent(in) :: path
     character(kind=c_char), allocatable :: c_path(:)
 
+    allocate(c_path(0))
     c_path = to_c_string(path)
     success = (fgof_temp_path_exists(c_path) /= 0_c_int)
   end function path_exists_posix
@@ -147,6 +154,7 @@ contains
     character(len=*), intent(in) :: path
     character(kind=c_char), allocatable :: c_path(:)
 
+    allocate(c_path(0))
     c_path = to_c_string(path)
     success = (fgof_temp_is_directory(c_path) /= 0_c_int)
   end function is_directory_path_posix
@@ -159,6 +167,8 @@ contains
     character(kind=c_char), allocatable :: c_destination(:)
     integer(c_int) :: c_errno
 
+    allocate(c_source(0))
+    allocate(c_destination(0))
     c_source = to_c_string(source)
     c_destination = to_c_string(destination)
     success = (fgof_temp_rename_path(c_source, c_destination, c_errno) /= 0_c_int)
